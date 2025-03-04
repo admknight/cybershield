@@ -49,7 +49,12 @@ ethical_warning() {
 ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 EOF
     echo -e "${NC}"
-    read -p "Do you have proper authorization? (yes/no): " auth
+    echo -e "${PURPLE}╭──────────────────────────────────────────────────────────────╮"
+    echo -e "│ ${CYAN}➤ Version: ${PINK}7.0 ${CYAN}| ${CYAN}Release Date: ${PINK}2025-03-01 ${CYAN}| ${CYAN}Author: ${PINK}ADMKNIGHT ${CYAN}│"
+    echo -e "│ ${CYAN}➤ GitHub: ${PINK}https://github.com/admknight/cybershield ${CYAN}                    │"
+    echo -e "╰──────────────────────────────────────────────────────────────╯${NC}"
+    
+    read -p "[❗] Confirm Authorization (yes/no): " auth
     [[ $auth != "yes" ]] && exit 0
     echo -e "${GREEN}[+] Authorization confirmed. Starting CyberShield...${NC}"
     sleep 2
@@ -166,6 +171,32 @@ sqlmap_dump() {
 }
 
 # ========================
+# Dark Web Monitoring
+# ========================
+darkweb_monitor() {
+    while true; do
+        read -p "Enter organization/domain (or 'back'): " target
+        [[ "$target" == "back" ]] && return
+        
+        confirm_action "$target" "dark web scan" || continue
+        
+        report_file=$(generate_filename "$target" "darkweb_scan")
+        echo -e "${BLUE}[+] Checking paste sites...${NC}"
+        curl -s "${DARKWEB_API}/search/$target" | jq '.data[].id' | while read id; do
+            echo -e "${RED}⚠️ Found paste: https://psbdmp.ws/$id${NC}"
+            echo "Paste ID: $id" >> "$report_file"
+        done
+        
+        echo -e "\n${BLUE}[+] Checking HIBP breaches...${NC}"
+        hibp_results=$(curl -s "https://haveibeenpwned.com/api/v3/breaches")
+        echo "$hibp_results" | jq -r ".[] | select(.Name | contains(\"$target\")) | \"Breach: \(.Name) | Date: \(.BreachDate)\"" >> "$report_file"
+        
+        echo -e "${GREEN}[+] Dark web scan completed. Report: ${report_file}${NC}"
+        return
+    done
+}
+
+# ========================
 # Helper Functions
 # ========================
 confirm_action() {
@@ -180,6 +211,46 @@ confirm_action() {
     esac
 }
 
+install_tool() {
+    local tool=$1
+    case $OS in
+        "KALI"|"WSL"|"LINUX")
+            sudo apt update && sudo apt install -y ${TOOLS[$tool]} >> "$LOG_FILE" 2>&1
+            ;;
+        "MACOS")
+            brew install ${TOOLS[$tool]} >> "$LOG_FILE" 2>&1
+            ;;
+    esac
+}
+
+verify_tools() {
+    mkdir -p "$REPORT_DIR"
+    for tool in "${!TOOLS[@]}"; do
+        if ! command -v $tool &>/dev/null; then
+            echo -e "${YELLOW}[+] Installing missing dependency: $tool${NC}"
+            install_tool $tool
+        fi
+    done
+}
+
+detect_os() {
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        if grep -qi "kali" /etc/os-release; then
+            OS="KALI"
+        elif uname -a | grep -qi "microsoft"; then
+            OS="WSL"
+        else
+            OS="LINUX"
+        fi
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        OS="MACOS"
+    else
+        echo -e "${RED}Unsupported OS${NC}"
+        exit 1
+    fi
+    echo -e "${BLUE}[+] Detected OS: $OS${NC}"
+}
+
 # ========================
 # Main Interface
 # ========================
@@ -190,25 +261,21 @@ main_menu() {
         echo "2. Web Application Scan"
         echo "3. Network Scan"
         echo "4. Dark Web Monitoring"
-        echo "5. Vulnerability Exploit Check"
-        echo "6. SQLMap Data Dump"
-        echo "7. Exit"
-        read -p "Choose option (1-7): " choice
+        echo "5. SQLMap Data Dump"
+        echo "6. Exit"
+        read -p "Choose option (1-6): " choice
 
         case $choice in
             1) verify_tools ;;
             2) web_scan ;;
             3) network_scan ;;
             4) darkweb_monitor ;;
-            5) exploit_check ;;
-            6) sqlmap_dump ;;
-            7) exit 0 ;;
+            5) sqlmap_dump ;;
+            6) exit 0 ;;
             *) echo -e "${RED}Invalid choice!${NC}" ;;
         esac
     done
 }
-
-# ... [Rest of the functions remain unchanged] ...
 
 # ========================
 # Execution Flow
